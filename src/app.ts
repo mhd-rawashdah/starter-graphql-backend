@@ -1,11 +1,23 @@
+import "reflect-metadata";
 import express, { Application } from 'express';
+import { ApolloServer } from 'apollo-server-express';
 import cors from 'cors';
 import logger from 'morgan';
 import hpp from 'hpp';
 import { ErrorsHandlerMiddleware } from './middlewares/';
-
+import { buildSchema, Query } from 'type-graphql';
+import { AppDataSource } from '../db';
+import { RegsiterResolver } from "./graphql";
 
 const { NODE_ENV, PORT } = process.env;
+
+
+class WelcomeResolver {
+    @Query(() => String)
+    async welcome() {
+        return "Welcome onboard!!";
+    }
+}
 
 class App {
     private app: Application;
@@ -17,13 +29,12 @@ class App {
         this.port = PORT || 5000;
         this.prodEnv = NODE_ENV === 'prod';
 
-        // TODO connect to DB
         this.connectDB();
 
         // Don't change the order
         this.initMiddlewares();
-        this.initApi();
-        this.initErrorHandling();
+        this.initGraphQL(this.app);
+        // this.initErrorHandling();
     }
 
     public listen() {
@@ -34,14 +45,14 @@ class App {
 
     private async connectDB() {
         try {
-            // CONNECT TO DB
+            await AppDataSource.initialize();
             console.log("DB Connection has been established successfully.");
         } catch (error) {
             console.error("Unable to connect to the database:", error);
         }
     }
 
-    private initMiddlewares() {
+    private initMiddlewares(): void{
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
         this.app.use(cors({ origin: true, credentials: true }));
@@ -49,14 +60,25 @@ class App {
         this.app.use(hpp());
     }
 
-    private initApi() {
-        // TODO Init APIs
+    private async initGraphQL(app: Application) {
+        const schema = await buildSchema({
+            resolvers: [RegsiterResolver, WelcomeResolver]
+        });
+        const apolloServer = new ApolloServer({schema});
+
+        await apolloServer.start();
+
+        apolloServer.applyMiddleware({app});
     }
 
-    private initErrorHandling() {
-        this.app.use(ErrorsHandlerMiddleware.notFound);
-        this.app.use(ErrorsHandlerMiddleware.errorHandle);
-    }
+    // private initApi(): void {
+    //     // TODO Init APIs
+    // }
+
+    // private initErrorHandling(): void {
+    //     this.app.use(ErrorsHandlerMiddleware.notFound);
+    //     this.app.use(ErrorsHandlerMiddleware.errorHandle);
+    // }
 
     // TODO init sawgger
 }

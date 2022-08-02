@@ -1,1 +1,1 @@
-# Ecommerce Backend
+# GraphQL Starter
